@@ -1,0 +1,84 @@
+def find_package_data(head, rhead):
+    data = []
+
+    for tail in os.listdir(head):
+        path = os.path.join(head, tail)
+        rpath = os.path.join(rhead, tail)
+
+        if os.path.isdir(path):
+            if not os.path.exists(os.path.join(path, '__init__.py')):
+                data.extend(find_package_data(path, rpath))
+
+        elif os.path.splitext(tail)[1] not in _DATA_EXT_BLACKLIST:
+            data.append(rpath)
+
+    return data
+
+
+def compose_package_metadata(head):
+    packages, package_dir, package_data = [], {}, {}
+
+    if os.path.exists(os.path.join(head, '__init__.py')):
+        pkg = head.replace('/', '.')
+        packages.append(pkg)
+        package_dir[pkg] = head
+        data = find_package_data(head, '')
+
+        if data:
+            package_data[pkg] = data
+
+    for tail in os.listdir(head):
+        path = os.path.join(head, tail)
+
+        if os.path.isdir(path):
+            result = compose_package_metadata(path)
+            packages.extend(result['packages'])
+            package_dir.update(result['package_dir'])
+            package_data.update(result['package_data'])
+
+    return {'packages': packages,
+            'package_dir': package_dir,
+            'package_data': package_data}
+
+
+def compose_addon_data_files(type_):
+    head = os.path.join("data_files", type_)
+
+    try:
+        tails = os.listdir(head)
+    except OSError as err:
+        if err.errno != errno.ENOENT:
+            raise
+        else:
+            return []
+    else:
+        for tail in tails:
+            path = os.path.join(head, tail)
+
+            if os.path.isdir(path):
+                return compose_data_files(path)
+
+
+def compose_data_files(head):
+    data_files = []
+
+    for dirpath, dirnames, filenames in os.walk(head):
+        if filenames:
+            instpath = os.path.join("/", dirpath[len(head):])
+            files = [os.path.join(dirpath, filename) for filename in filenames]
+            data_files.append((instpath, files))
+
+    return data_files
+
+
+def compose_scripts():
+    try:
+        scripts = os.listdir("scripts")
+    except OSError as err:
+        if err.errno != errno.ENOENT:
+            raise
+        else:
+            return {}
+    else:
+        return {'scripts': [os.path.join("scripts", script)
+                                                        for script in scripts]}
